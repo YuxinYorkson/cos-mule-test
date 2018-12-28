@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:java="http://www.mulesoft.org/schema/mule/java" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="df1480d1-9fe4-4155-a664-c94ad37582ed" >
+		<http:listener-connection host="0.0.0.0" port="8085" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="6e24344c-c02d-41c2-832e-18c14d1fba0b" >
+		<db:oracle-connection host="localhost" user="root" password="123456" instance="xe" />
+	</db:config>
+	<apikit:config outboundHeadersMapName="outboundHeadersMapName" httpStatusVarName="httpStatus" doc:name="Router" doc:id="667bb38e-3020-4ab0-ad8f-bb29bc7cea76" name="api-config" disableValidations="true" raml="testApi.raml">
+		<apikit:flow-mappings >
+			<apikit:flow-mapping resource="/login" action="post" content-type="application/json" flow-ref="post:login" />
+			<apikit:flow-mapping resource="/registry" action="post" content-type="application/json" flow-ref="post:registry" />
+			<apikit:flow-mapping resource="/apps" action="post" content-type="application/json" flow-ref="post:apps" />
+			<apikit:flow-mapping resource="/app-detail" action="post" content-type="application/json" flow-ref="post:app-detail" />
+			<apikit:flow-mapping resource="/save-app" action="post" content-type="application/json" flow-ref="post:save-app" />
+			<apikit:flow-mapping resource="/username-check" action="post" content-type="application/json" flow-ref="post:username-check" />
+		</apikit:flow-mappings>
+	</apikit:config>
+	<http:listener-config name="HTTP_Listener_config1" doc:name="HTTP Listener config" doc:id="3e881878-1549-4afa-9dff-0ac96dc44fdd" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="testFlow" doc:id="e3dcd857-539b-49bf-9300-4f07e769a9e1" >
+		<http:listener doc:name="Listener" doc:id="b95e1047-532b-4240-89ab-eb510163dd7a" config-ref="HTTP_Listener_config1" path="/api/*">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*",
+	"Access-Control-Allow-Methods" : "*",
+	"Access-Control-Allow-Headers" : "X-Requested-With,Content-Type",
+	"Accept" : "*/*",
+	"Content-type" : "application/json"
+}]]]></http:headers>
+			</http:response>
+			<http:error-response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:error-response>
+		</http:listener>
+		<apikit:router doc:name="APIkit Router" doc:id="fa867cbd-9ecc-4254-98e4-0f12843e8627" config-ref="api-config"/>
+	</flow>
+	<flow name="post:login" doc:id="072ff89c-e34f-43ad-aebe-26f6ffdb096b" >
+		<set-variable value='#[message.payload."username"]' doc:name="Set Variable" doc:id="644363da-f1d1-4929-af15-f21ddfa21fa4" variableName="username" />
+		<set-variable value='#[message.payload."password"]' doc:name="Set Variable" doc:id="05ab3755-0949-48dd-9ef4-fcb6cd324b6f" variableName="password"/>
+		<logger level="INFO" doc:name="Logger" doc:id="7a9d2345-8549-428b-a1c0-db91ffbcc000" message="#[vars]"/>
+		<db:select doc:name="Select" doc:id="f9129a13-0576-4d01-a0a7-c5ecb89ed531" config-ref="Database_Config">
+			<db:sql >select * from USERS u WHERE u.USERNAME=:a AND u.PASSWORD=:b</db:sql>
+			<db:input-parameters ><![CDATA[#[{a:vars.username,b:vars.password}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="7dfaa343-83fe-4768-96c3-081d192f89de" >
+			<when expression="#[sizeOf(payload) &gt; 0]">
+				<logger level="INFO" doc:name="Logger" doc:id="4c8a97a2-ae52-4551-9240-8ee47a1f1b32" message="#[payload]" />
+				<set-payload doc:name="Set Payload" doc:id="dff2195f-1f4e-452b-8b0c-09fb13ae0a66" value='success' />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="9a51cf6b-60ab-431b-90bc-8a121672e751" message="#[payload]" />
+				<set-payload value='fail' doc:name="Set Payload" doc:id="6b554454-4877-46ba-8d59-e72a72a01b4b" />
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="Transform Message" doc:id="7c29376e-0582-4e57-962e-d65ec609737c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	data:payload
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="d5346263-ed10-44f1-a602-24834924212b" message="#[payload]"/>
+	</flow>
+	<flow name="post:apps" doc:id="54170318-a11d-4579-99fa-4eb0a896761f" >
+		<set-variable value="#[message.payload.username]" doc:name="Set Variable" doc:id="ec95dd2a-e6b1-4ed8-8e42-3e2cafafdc74" variableName="username"/>
+		<db:select doc:name="Select" doc:id="a0fd0657-4a60-4983-93ac-b9976a94e5e4" config-ref="Database_Config">
+			<db:sql >select * from APPS_TAB u WHERE u.USERNAME=:a</db:sql>
+			<db:input-parameters ><![CDATA[#[{a:vars.username}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="8d84b7de-b0ef-4e10-a0c7-9f8cab6a5432" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	data:payload
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="58c978ee-7534-400c-9f1c-93e2b107f494" message="#[payload]"/>
+	</flow>
+	<flow name="post:username-check" doc:id="0f701344-27a4-4726-87e7-29b948f0063b" >
+		<set-variable value='#[message.payload."username"]' doc:name="Set Variable" doc:id="2e8e2da9-0546-40fc-87e3-7f8acee24704" variableName="username"/>
+		<db:select doc:name="Select" doc:id="da762f07-7758-4e7e-af68-599d1f550f7a" config-ref="Database_Config">
+			<db:sql >select * from USERS u WHERE u.USERNAME=:a</db:sql>
+			<db:input-parameters ><![CDATA[#[{a:vars.username}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="0ed8c922-6397-4768-98ac-c8cddee468a1" >
+			<when expression="#[sizeOf(payload) == 0]">
+				<set-payload value="success" doc:name="Set Payload" doc:id="9b2943ee-83c1-4474-b9ab-60650146bbca" />
+				<ee:transform doc:name="Transform Message" doc:id="2c646e30-ea39-4815-ad93-b57c04019b7f">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	data:payload
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise >
+				<set-payload value="fail" doc:name="Set Payload" doc:id="6e55d457-4bcc-4145-8fd9-e2303f2b9901" />
+				<ee:transform doc:name="Transform Message" doc:id="e38f353c-d432-4b0d-9cc1-e356684da774" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	data:payload
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="7b950eef-ba6d-476c-aca1-187ca0acec6d" message="#[payload]"/>
+	</flow>
+	<flow name="post:registry" doc:id="9b5c5f0f-51c4-46ff-b629-efd6f3a598c1" >
+		<set-variable value='#[message.payload."username"]' doc:name="Set Variable" doc:id="9cd2a75d-afe1-44eb-8be1-80cf089a0905" variableName="username"/>
+		<set-variable value='#[message.payload."password"]' doc:name="Set Variable" doc:id="72a1a201-578c-4272-8fe0-150a4026a998" variableName="password"/>
+		<db:insert doc:name="Insert" doc:id="5485b8d2-d18f-411b-b409-72cb69af3727" config-ref="Database_Config">
+			<db:sql >insert into USERS u (u.USERNAME, u.PASSWORD) values (:a, :b)</db:sql>
+			<db:input-parameters ><![CDATA[#[{a:vars.username,b:vars.password}]]]></db:input-parameters>
+		</db:insert>
+		<set-payload value="success" doc:name="Set Payload" doc:id="05ca72c7-edcb-453c-81e0-33d704d6d7b4" />
+		<ee:transform doc:name="Transform Message" doc:id="c834a48d-ab3b-4f23-9470-596970f29c3d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	data:payload
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="bcc418ea-c657-485e-917e-ad3c293ab626" message="#[payload]"/>
+	</flow>
+	<flow name="post:app-detail" doc:id="50ef6fdd-49d9-453d-a5ba-a4ac09f07dea" >
+		<ee:transform doc:name="Transform Message" doc:id="0eb74f1d-7f73-41db-8251-ffc66c1c575a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="5ae0ce46-f111-492b-b85c-81e29b910ff4" />
+	</flow>
+	<flow name="post:save-app" doc:id="03743884-6bb6-4d49-8074-ef6612297d15" >
+		<ee:transform doc:name="Transform Message" doc:id="b84cdd85-3f35-404a-86b4-427bcd8cc4d6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="testFlow4" doc:id="03bb6bf8-6a57-4fc5-b983-5cf5d69acd06" >
+		<http:listener doc:name="Listener" doc:id="d6233416-75fb-449a-b1f7-e358c97eb411" config-ref="HTTP_Listener_config" path="/api/login">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="6e810281-5739-4b8e-9163-a9bc31770376" message="#[payload]"/>
+		<choice doc:name="Choice" doc:id="9f85286f-be94-4bc8-8734-cc0150710c59" >
+			<when expression='#[message.attributes.method == "POST"]'>
+				<set-variable value="#[message.payload.username]" doc:name="Set Variable" doc:id="eecb8c03-d21a-4d63-a6de-bb777598275f" variableName="username" />
+				<set-variable value="#[message.payload.password]" doc:name="Set Variable" doc:id="d535968e-0a72-4db4-8692-a5372011937e" variableName="password" />
+				<logger level="INFO" doc:name="Logger" doc:id="53f33346-2e1a-40b1-abe7-82c2eeba6e8f" message="#[vars]" />
+				<db:select doc:name="Select" doc:id="170fcbbc-1a31-4b2f-a4d6-9955c84aae26" config-ref="Database_Config">
+			<db:sql>select * from USERS u WHERE u.USERNAME=:a AND u.PASSWORD=:b</db:sql>
+			<db:input-parameters><![CDATA[#[{a:vars.username,b:vars.password}]]]></db:input-parameters>
+		</db:select>
+				<choice doc:name="Choice" doc:id="ab050fec-5103-43d9-b7c5-5625146ff9e1">
+			<when expression="#[sizeOf(payload) &gt; 0]">
+				<logger level="INFO" doc:name="Logger" doc:id="64ccc511-a8c0-4b3e-ba53-dbf017d8d9d9" />
+				<set-payload value="#[payload]" doc:name="Set Payload" doc:id="b1a86b92-7aa2-458f-93d3-bcbaa4dc6f5b" />
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="56962740-6d81-4ac7-a4bc-472393f4d14f" />
+				<set-payload value='"Invalid username or password"' doc:name="Set Payload" doc:id="7d44069f-94a2-4ba4-b04f-951d27e28813" />
+			</otherwise>
+		</choice>
+			</when>
+			<otherwise >
+				<set-variable value="#[message.attributes.method]" doc:name="Set Variable" doc:id="de996448-417e-4590-9d4b-2fdf8bb6ad2c" variableName="queryMethod"/>
+				<set-payload value="#[vars.queryMethod]" doc:name="Set Payload" doc:id="b951b340-2bd3-48ad-ae41-139acc495645" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="a26a2e42-e35f-4d40-bcaf-f67c6456e61b" message="#[payload]"/>
+	</flow>
+</mule>
